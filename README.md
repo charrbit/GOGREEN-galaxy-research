@@ -3,7 +3,7 @@ Christian Harris
 KU Galaxy Evolution Group
 
 Allocated Work Times:
-TWR 9-12am
+(New Times Pending)
 
 Trello:
 https://trello.com/b/gBKIhLKA/galaxy-research

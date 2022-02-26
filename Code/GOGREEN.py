@@ -1,4 +1,3 @@
-from inspect import GEN_CREATED
 from astropy.table import Table
 from astropy.io import fits, ascii
 import pandas as pd
@@ -18,15 +17,15 @@ class GOGREEN:
         self.clusters_cat = self.path + 'DR1/CATS/Clusters.fits'
         self.photo_cat = self.path + 'DR1/CATS/Photo.fits'
         self.redshift_cat = self.path + 'DR1/CATS/Redshift_catalogue.fits'
-        self.galfit_cat = None
-        self.matched_cat = None
+        self.galfit_cat = 'NOT INITIALIZED, call loadStruct()' # This error message will print if the user tries to access
+        self.matched_cat = 'NOT INITIALIZED, call loadStruct()'# structural parameter cats before specifying target cluster
 
         self.init()
 
     # HELPER METHODS
     def init(self):
-        self.clusters_cat = self.generateDF(self.clusters_cat),
-        self.photo_cat = self.generateDF(self.photo_cat),
+        self.clusters_cat = self.generateDF(self.clusters_cat)
+        self.photo_cat = self.generateDF(self.photo_cat)
         self.redshift_cat = self.generateDF(self.redshift_cat)
         # Structural paramater catalogs to load are not known at startup
         # Need to call loadStruct() to initialize
@@ -34,27 +33,27 @@ class GOGREEN:
         self.cats = [self.clusters_cat, self.photo_cat, self.redshift_cat, self.galfit_cat, self.matched_cat]
 
     def generateDF(self, path: 'Path to data file', ftype: 'Data file extension type' ='fits') -> 'Pandas Dataframe':
-        data = 0
+        data = pd.DataFrame()
         if ftype == 'fits':
-            data = Table( fits.getdata( path ) ).to_pandas() 
+            data = Table( fits.getdata( path ) ).to_pandas()
         elif ftype == 'dat':
             data = pd.read_csv(path, sep='\s+', engine='python', header=1)
 
         return data
 
     # USER METHODS
-    def loadStruct(self, targetCluster:'"Shortname" of structural cluster to load', cat:'galfit/matched'='matched') -> 'Pandas Dataframe':
+    def loadStruct(self, targetCluster:'"Shortname" of structural cluster to load', cat:'Structural catalog to search (galfit/matched). Default="matched"'='matched') -> 'Pandas Dataframe':
         galfitPath = self.path + 'STRUCTURAL_PARA_v1.1_CATONLY/GALFIT_ORG_CATS/'
         matchedPath = self.path + 'STRUCTURAL_PARA_v1.1_CATONLY/STRUCTCAT_MATCHED/'
 
         if cat == 'matched': 
-            self.cats[catalogDict[cat]] = self.generateDF(galfitPath + 'structcat_photmatch_' + targetCluster.lower() + '.dat', ftype='dat')
+            self.cats[catalogDict[cat]] = self.generateDF(matchedPath + 'structcat_photmatch_' + targetCluster.lower() + '.dat', ftype='dat')
         else:
-            self.cats[catalogDict[cat]] = self.generateDF(matchedPath + 'gal_' + targetCluster.lower() + '_orgcat.fits')
+            self.cats[catalogDict[cat]] = self.generateDF(galfitPath + 'gal_' + targetCluster.lower() + '_orgcat.fits')
 
         return self.cats[catalogDict[cat]]
 
-    def get(self, cat: 'Catalog to get ("clusters/photo/redshift/galfit/matched/all")' = 'clusters') -> 'Pandas Dataframe':
+    def get(self, cat: 'Catalog to get ("clusters/photo/redshift/galfit/matched/all"). Default="clusters"' = 'clusters') -> 'Pandas Dataframe or [Pandas Dataframe] (if cat="all")':
         if (cat == 'all'):
             return self.cats
         return self.cats[catalogDict[cat]]

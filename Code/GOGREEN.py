@@ -89,6 +89,7 @@ class GOGREEN:
                 # The first column in this catalog is "cluster"
                 # Modify the query string to cluster==@targetCluster (convert first letter to lowercase c)
                 queryString = queryString[0].lower() + queryString[1:]
+                print(queryString)
             # Reduce the search results to contain only targetCluster data    
             searchResults = searchResults.query(queryString)
         # Reduce the search results to members of targetCluster that meet the constraints specified in criteria

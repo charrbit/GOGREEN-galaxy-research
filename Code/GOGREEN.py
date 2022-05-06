@@ -175,7 +175,7 @@ class GOGREEN:
     # END GETCLUSTERGALAXIES
 
     def plot(self, xQuantityName:str, yQuantityName:str, plotType:int, clusterName:str=None, additionalCriteria:list=None, onlyMembers:bool=True, colorType:str=None,
-             colors:list=None, useStandards:bool=True, xRange:list=None, yRange:list=None, xUnits:str='', yUnits:str='', useLog:list=[False,False]):
+             colors:list=None, useStandards:bool=True, xRange:list=None, yRange:list=None, xLabel:str='', yLabel:str='', useLog:list=[False,False]):
         """
         plot Generates a plot(s) of param:xQuantityName vs param:yQuantityName according to param:plotType
              
@@ -204,9 +204,9 @@ class GOGREEN:
                                     Default: None
         :param yRange:             List containing the desired lower and upper bounds for the y-axis
                                     Default: None
-        :param xUnits:             Units of param:xQuantityName to be used in the x-axis label
+        :param xLabel:             Label to put on the x-axis
                                     Default: Empty string
-        :param yUnits:             Units of param:yQuantityName to be used in the y-axis label
+        :param yLabel:             Label to put on the y-axis
                                     Default: Empty string
         :param useLog:             Flag to indicate whether the x- or y-axis should be in log scale
                                     Default: [False,False] - neither axis in log scale
@@ -236,16 +236,36 @@ class GOGREEN:
             data = self.reduceDF(data, additionalCriteria, useStandards)
             # Plot depending on how the values should be colored
             if colorType == None:
-                plt.scatter(data[xQuantityName].values, data[yQuantityName].values, color=color1)
+                xData = data[xQuantityName].values
+                yData = data[yQuantityName].values
+                # Check if either axis needs to be put in log scale
+                if useLog[0] == True:
+                    xData = np.log10(xData)
+                if useLog[1] == True:
+                    yData = np.log10(yData)
+                plt.scatter(xData, yData, color=color1)
             elif colorType == 'membership':
-                specZ = data[~data['zspec'].isna()]
-                photZ = data[~data['cPHOTID'].isin(specZ['cPHOTID'])]
+                # .copy() is needed here to prevent a warning about making modifications if log scale is to be used
+                specZ = data[~data['zspec'].isna()].copy()
+                photZ = data[~data['cPHOTID'].isin(specZ['cPHOTID'])].copy()
+                if useLog[0] == True:
+                    specZ.loc[:, xQuantityName] = np.log10(specZ.loc[:, xQuantityName])
+                    photZ.loc[:, xQuantityName] = np.log10(photZ.loc[:, xQuantityName])
+                if useLog[1] == True:
+                    specZ.loc[:, yQuantityName] = np.log10(specZ.loc[:, yQuantityName])
+                    photZ.loc[:, yQuantityName] = np.log10(photZ.loc[:, yQuantityName])
                 plt.scatter(specZ[xQuantityName].values, specZ[yQuantityName].values, color=color1, label='Spectroscopic z')
                 plt.scatter(photZ[xQuantityName].values, photZ[yQuantityName].values, color=color2, label='Photometric z')
             elif colorType == 'passive':
                 passiveQuery = '(UMINV > 1.3) and (VMINJ < 1.6) and (UMINV > 0.60+VMINJ)'
-                passive = data.query(passiveQuery)
-                starForming = data[~data['cPHOTID'].isin(passive['cPHOTID'])]
+                passive = data.query(passiveQuery).copy()
+                starForming = data[~data['cPHOTID'].isin(passive['cPHOTID'])].copy()
+                if useLog[0] == True:
+                    passive.loc[:, xQuantityName] = np.log10(passive.loc[:, xQuantityName])
+                    starForming.loc[:, xQuantityName] = np.log10(starForming.loc[:, xQuantityName])
+                if useLog[1] == True:
+                    passive.loc[:, yQuantityName] = np.log10(passive.loc[:, yQuantityName])
+                    starForming.loc[:, yQuantityName] = np.log10(starForming.loc[:, yQuantityName])
                 plt.scatter(passive[xQuantityName].values, passive[yQuantityName].values, color=color1, label='Quiescent')
                 plt.scatter(starForming[xQuantityName].values, starForming[yQuantityName].values, color=color2, label='Star Forming')
             else:
@@ -269,29 +289,42 @@ class GOGREEN:
                     data = self.reduceDF(data, additionalCriteria, useStandards)
 
                     if colorType == None:
-                        axes[i][j].scatter(data[xQuantityName].values, data[yQuantityName].values, c=color1)
+                        xData = data[xQuantityName].values
+                        yData = data[yQuantityName].values
+                        # Check if either axis needs to be put in log scale
+                        if useLog[0] == True:
+                            xData = np.log10(xData)
+                        if useLog[1] == True:
+                            yData = np.log10(yData)
+                        axes[i][j].scatter(xData, yData, c=color1)
                     elif colorType == 'membership':
-                        specZ = data[~data['zspec'].isna()]
-                        photZ = data[~data['cPHOTID'].isin(specZ['cPHOTID'])]
+                        specZ = data[~data['zspec'].isna()].copy()
+                        photZ = data[~data['cPHOTID'].isin(specZ['cPHOTID'])].copy()
+                        if useLog[0] == True:
+                            specZ.loc[:, xQuantityName] = np.log10(specZ.loc[:, xQuantityName])
+                            photZ.loc[:, xQuantityName] = np.log10(photZ.loc[:, xQuantityName])
+                        if useLog[1] == True:
+                            specZ.loc[:, yQuantityName] = np.log10(specZ.loc[:, yQuantityName])
+                            photZ.loc[:, yQuantityName] = np.log10(photZ.loc[:, yQuantityName])
                         axes[i][j].scatter(specZ[xQuantityName].values, specZ[yQuantityName].values, color=color1, label='Spectroscopic z')
                         axes[i][j].scatter(photZ[xQuantityName].values, photZ[yQuantityName].values, color=color2, label='Photometric z')
                     elif colorType == 'passive':
                         passiveQuery = '(UMINV > 1.3) and (VMINJ < 1.6) and (UMINV > 0.60+VMINJ)'
-                        passive = data.query(passiveQuery)
-                        starForming = data[~data['cPHOTID'].isin(passive['cPHOTID'])]
+                        passive = data.query(passiveQuery).copy()
+                        starForming = data[~data['cPHOTID'].isin(passive['cPHOTID'])].copy()
+                        if useLog[0] == True:
+                            passive.loc[:, xQuantityName] = np.log10(passive.loc[:, xQuantityName])
+                            starForming.loc[:, xQuantityName] = np.log10(starForming.loc[:, xQuantityName])
+                        if useLog[1] == True:
+                            passive.loc[:, yQuantityName] = np.log10(passive.loc[:, yQuantityName])
+                            starForming.loc[:, yQuantityName] = np.log10(starForming.loc[:, yQuantityName])
                         axes[i][j].scatter(passive[xQuantityName].values, passive[yQuantityName].values, color=color1, label='Quiescent')
                         axes[i][j].scatter(starForming[xQuantityName].values, starForming[yQuantityName].values, color=color2, label='Star Forming')
                     else:
                         print(colorType, ' is not a valid coloring scheme!')
 
                     # Plot configurations
-                    xAxisLabel = xQuantityName + " " + xUnits
-                    if useLog[0]:
-                        xAxisLabel = 'log(' + xQuantityName + ") " + xUnits
-                    yAxisLabel = yQuantityName + " " + yUnits
-                    if useLog[1]:
-                        yAxisLabel = 'log(' + yQuantityName + ") " + yUnits
-                    axes[i][j].set(xlabel=xAxisLabel, ylabel=yAxisLabel)
+                    axes[i][j].set(xlabel=xLabel, ylabel=yLabel)
                     if (xRange != None):
                         axes[i][j].set(xlim=xRange)
                     if (yRange != None):
@@ -319,10 +352,24 @@ class GOGREEN:
                 data = self.reduceDF(data, additionalCriteria, useStandards)
 
                 if colorType == None:
-                    plt.scatter(data[xQuantityName].values, data[yQuantityName].values, c=color1)
+                    xData = data[xQuantityName].values
+                    yData = data[yQuantityName].values
+                    # Check if either axis needs to be put in log scale
+                    if useLog[0] == True:
+                        xData = np.log10(xData)
+                    if useLog[1] == True:
+                        yData = np.log10(yData)
+                    plt.scatter(xData, yData, c=color1)
                 elif colorType == 'membership':
-                    specZ = data[~data['zspec'].isna()]
-                    photZ = data[data['zspec'].isna()]
+                    specZ = data[~data['zspec'].isna()].copy()
+                    photZ = data[data['zspec'].isna()].copy()
+                    if useLog[0] == True:
+                        specZ.loc[:, xQuantityName] = np.log10(specZ.loc[:, xQuantityName])
+                        photZ.loc[:, xQuantityName] = np.log10(photZ.loc[:, xQuantityName])
+                    if useLog[1] == True:
+                        specZ.loc[:, yQuantityName] = np.log10(specZ.loc[:, yQuantityName])
+                        photZ.loc[:, yQuantityName] = np.log10(photZ.loc[:, yQuantityName])
+                    # Only add legend labels for the last plot
                     if (clusterName != self._structClusterNames[-1]):
                         plt.scatter(specZ[xQuantityName].values, specZ[yQuantityName].values, color=color1)
                         plt.scatter(photZ[xQuantityName].values, photZ[yQuantityName].values, color=color2)
@@ -331,8 +378,14 @@ class GOGREEN:
                         plt.scatter(photZ[xQuantityName].values, photZ[yQuantityName].values, color=color2, label='Photometric z')
                 elif colorType == 'passive':
                     passiveQuery = '(UMINV > 1.3) and (VMINJ < 1.6) and (UMINV > 0.60+VMINJ)'
-                    passive = data.query(passiveQuery)
-                    starForming = data[~data['cPHOTID'].isin(passive['cPHOTID'])]
+                    passive = data.query(passiveQuery).copy()
+                    starForming = data[~data['cPHOTID'].isin(passive['cPHOTID'])].copy()
+                    if useLog[0] == True:
+                        passive.loc[:, xQuantityName] = np.log10(passive.loc[:, xQuantityName])
+                        starForming.loc[:, xQuantityName] = np.log10(starForming.loc[:, xQuantityName])
+                    if useLog[1] == True:
+                        passive.loc[:, yQuantityName] = np.log10(passive.loc[:, yQuantityName])
+                        starForming.loc[:, yQuantityName] = np.log10(starForming.loc[:, yQuantityName])
                     if (clusterName != self._structClusterNames[-1]):
                         plt.scatter(passive[xQuantityName].values, passive[yQuantityName].values, color=color1)
                         plt.scatter(starForming[xQuantityName].values, starForming[yQuantityName].values, color=color2)
@@ -344,18 +397,12 @@ class GOGREEN:
 
         # plotType == 2 handles plot configurations for each individual subplot
         if plotType != 2:
-            xAxisLabel = xQuantityName + " " + xUnits
-            if useLog[0]:
-                xAxisLabel = 'log(' + xQuantityName + ") " + xUnits
-            plt.xlabel(xAxisLabel)
+            plt.xlabel(xLabel)
+            plt.ylabel(yLabel)
             if (xRange != None):
                 plt.xlim(xRange[0], xRange[1])
-            yAxisLabel = yQuantityName + " " + yUnits
-            if useLog[1]:
-                yAxisLabel = 'log(' + yQuantityName + ") " + yUnits
             if (yRange != None):
                 plt.ylim(yRange[0], yRange[1])
-            plt.ylabel(yAxisLabel) 
             plt.legend()
             plt.show()
     # END PLOT

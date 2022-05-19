@@ -33,17 +33,21 @@ class GOGREEN:
         """
         init Helper method for initializing catalogs
         """ 
-        # Build path string to the desired catalog
+        # Build path string to the cluster catalog
         clusterCatPath = self._path + 'DR1/CATS/Clusters.fits'
         # Generate a DataFrame of the catalog data
         self._clustersCatalog = self.generateDF(clusterCatPath)
         # Remove whitespaces included with some cluster names
         self._clustersCatalog['cluster'] = self._clustersCatalog['cluster'].str.strip()
 
+        # Build path string to the photometric catalog
         photoCatPath = self._path + 'DR1/CATS/Photo.fits'
+        # Generate a DataFrame of the catalog data
         self._photoCatalog = self.generateDF(photoCatPath)
 
+        # Build path string to the redshift catalog
         redshiftCatPath = self._path + 'DR1/CATS/Redshift_catalogue.fits'
+        # Generate a DataFrame of the catalog data
         self._redshiftCatalog = self.generateDF(redshiftCatPath)
 
         # Build a DataFrame for each galfit and matched structural parameter cluster (11 total)
@@ -59,10 +63,12 @@ class GOGREEN:
                 galfitClusterFilename = 'gal_spj' + clusterName[-4:] + '_orgcat.fits'
                 matchedClusterFilename = 'structcat_photmatch_spj' + clusterName[-4:] + '.dat'
 
+            # Generate a DataFrame of the galfit cluster data
             galfitClusterDF = self.generateDF(galfitCatPath + galfitClusterFilename)
             # Combine it with the main galfit DataFrame
             self._galfitCatalog = self._galfitCatalog.append(galfitClusterDF)
 
+            # Generate a DataFrame of the struct matched cluster data
             matchedClusterDF = self.generateDF(matchedCatPath + matchedClusterFilename)
             # Convert PHOTCATID to cPHOTID
             # Find a cPHOTID of the cluster in the photometric catalog 
@@ -72,6 +78,7 @@ class GOGREEN:
             # Convert the structural catalog PHOTCATID into the photometric catalog cPHOTID
             matchedClusterDF.rename(columns = {'PHOTCATID':'cPHOTID'}, inplace = True)
             matchedClusterDF.loc[:,'cPHOTID'] += idPrefix
+            # Combine it with the main struct matched DataFrame
             self._matchedCatalog = self._matchedCatalog.append(matchedClusterDF)
 
         # Merge photomatched structural catalog with photometric catalog
@@ -125,7 +132,7 @@ class GOGREEN:
 
     def getMembers(self, clusterName:str) -> pd.DataFrame:
         """
-        getMembers Gets the member galaxies of a cluster based on the galaxys redshift with respect to the
+        getMembers Gets the member galaxies of a cluster based on the galaxy redshift with respect to the
                    best estimate of the cluster redshift
 
         :param clusterName: Name of the cluster whose members should be returned
@@ -134,8 +141,10 @@ class GOGREEN:
         clusterZ = self.getClusterZ(clusterName)
         allClusterGalaxies = self.getClusterGalaxies(clusterName)
         # Find spectroscopic and photometric members seperately
+        # Spectrosocpic criteria: (zspec-zclust) < 0.02(1+zspec)
         specZthreshold = np.abs(allClusterGalaxies['zspec'].values-clusterZ) < 0.02*(1+allClusterGalaxies['zspec'].values)
         specZgalaxies = allClusterGalaxies[specZthreshold]
+        # Photometric criteria: (zphot-zclust) < 0.08(1+zphot)
         photZthreshold = np.abs(allClusterGalaxies['zphot'].values-clusterZ) < 0.08*(1+allClusterGalaxies['zphot'].values)
         photZgalaxies = allClusterGalaxies[photZthreshold]
         # Remove photZgalaxies with a specZ
@@ -218,9 +227,11 @@ class GOGREEN:
         # Generate random colors
         color1 = [1, rng.random(), rng.random()]
         color2 = [0, rng.random(), rng.random()]
+        # Check if plot colors were provided by the user
         if (colors != None):
             color1 = colors[0]
             color2 = colors[1]
+
         # Plot only the cluster specified
         if plotType == 1:
             if clusterName == None:
@@ -229,13 +240,13 @@ class GOGREEN:
             # Get all galaxies associated with this cluster
             data = self.getClusterGalaxies(clusterName)
             if onlyMembers:
-                # Reduce data to only contain galaxies with
-                # (zphot-zclust) < 0.08(1+zphot) and (zspec-zclust) < 0.02(1+zspec)
+                # Reduce data to only contain galaxies classified as members
                 data = self.getMembers(clusterName)
             # Apply other specified reducing constraints
             data = self.reduceDF(data, additionalCriteria, useStandards)
             # Plot depending on how the values should be colored
             if colorType == None:
+                # Extract desired quantities from data
                 xData = data[xQuantityName].values
                 yData = data[yQuantityName].values
                 # Check if either axis needs to be put in log scale
@@ -243,29 +254,39 @@ class GOGREEN:
                     xData = np.log10(xData)
                 if useLog[1] == True:
                     yData = np.log10(yData)
+                # Generate the plot
                 plt.scatter(xData, yData, color=color1)
             elif colorType == 'membership':
+                # Extract desired quantities from data
                 # .copy() is needed here to prevent a warning about making modifications if log scale is to be used
                 specZ = data[~data['zspec'].isna()].copy()
+                # Assume photZ are those that do not have a specZ
                 photZ = data[~data['cPHOTID'].isin(specZ['cPHOTID'])].copy()
+                # Check if either axis needs to be put in log scale
                 if useLog[0] == True:
                     specZ.loc[:, xQuantityName] = np.log10(specZ.loc[:, xQuantityName])
                     photZ.loc[:, xQuantityName] = np.log10(photZ.loc[:, xQuantityName])
                 if useLog[1] == True:
                     specZ.loc[:, yQuantityName] = np.log10(specZ.loc[:, yQuantityName])
                     photZ.loc[:, yQuantityName] = np.log10(photZ.loc[:, yQuantityName])
+                # Generate the plot
                 plt.scatter(specZ[xQuantityName].values, specZ[yQuantityName].values, color=color1, label='Spectroscopic z')
                 plt.scatter(photZ[xQuantityName].values, photZ[yQuantityName].values, color=color2, label='Photometric z')
             elif colorType == 'passive':
+                # Build passive query string (from van der Burg 2020)
                 passiveQuery = '(UMINV > 1.3) and (VMINJ < 1.6) and (UMINV > 0.60+VMINJ)'
+                # Extract desired quantities from data
                 passive = data.query(passiveQuery).copy()
+                # Assume star forming are those that are not passive
                 starForming = data[~data['cPHOTID'].isin(passive['cPHOTID'])].copy()
+                # Check if either axis needs to be put in log scale
                 if useLog[0] == True:
                     passive.loc[:, xQuantityName] = np.log10(passive.loc[:, xQuantityName])
                     starForming.loc[:, xQuantityName] = np.log10(starForming.loc[:, xQuantityName])
                 if useLog[1] == True:
                     passive.loc[:, yQuantityName] = np.log10(passive.loc[:, yQuantityName])
                     starForming.loc[:, yQuantityName] = np.log10(starForming.loc[:, yQuantityName])
+                # Generate the plot
                 plt.scatter(passive[xQuantityName].values, passive[yQuantityName].values, color=color1, label='Quiescent')
                 plt.scatter(starForming[xQuantityName].values, starForming[yQuantityName].values, color=color2, label='Star Forming')
             else:
@@ -273,7 +294,7 @@ class GOGREEN:
 
         # Plot all clusters individually in a subplot
         elif plotType == 2:
-            # Generate the subplot
+            # Generate the subplots
             _, axes = plt.subplots(4,3,figsize=(15,12))
             currentIndex = 0
             # Loop over each subplot
@@ -283,12 +304,16 @@ class GOGREEN:
                     if (currentIndex == len(self._structClusterNames)):
                         break
                     currentClusterName = self._structClusterNames[currentIndex]
+                    # Get all galaxies associated with this cluster
                     data = self.getClusterGalaxies(currentClusterName)
                     if onlyMembers:
+                        # Reduce data to only contain galaxies classified as members
                         data = self.getMembers(currentClusterName)
+                    # Apply other specified reducing constraints
                     data = self.reduceDF(data, additionalCriteria, useStandards)
-
+                    # Plot depending on how the values should be colored
                     if colorType == None:
+                        # Extract desired quantities from data
                         xData = data[xQuantityName].values
                         yData = data[yQuantityName].values
                         # Check if either axis needs to be put in log scale
@@ -296,34 +321,44 @@ class GOGREEN:
                             xData = np.log10(xData)
                         if useLog[1] == True:
                             yData = np.log10(yData)
+                        # Generate the plot on the subplot
                         axes[i][j].scatter(xData, yData, c=color1)
                     elif colorType == 'membership':
+                        # Extract desired quantities from data
+                        # .copy() is needed here to prevent a warning about making modifications if log scale is to be used
                         specZ = data[~data['zspec'].isna()].copy()
                         photZ = data[~data['cPHOTID'].isin(specZ['cPHOTID'])].copy()
+                        # Check if either axis needs to be put in log scale
                         if useLog[0] == True:
                             specZ.loc[:, xQuantityName] = np.log10(specZ.loc[:, xQuantityName])
                             photZ.loc[:, xQuantityName] = np.log10(photZ.loc[:, xQuantityName])
                         if useLog[1] == True:
                             specZ.loc[:, yQuantityName] = np.log10(specZ.loc[:, yQuantityName])
                             photZ.loc[:, yQuantityName] = np.log10(photZ.loc[:, yQuantityName])
+                        # Generate the plot on the subplot
                         axes[i][j].scatter(specZ[xQuantityName].values, specZ[yQuantityName].values, color=color1, label='Spectroscopic z')
                         axes[i][j].scatter(photZ[xQuantityName].values, photZ[yQuantityName].values, color=color2, label='Photometric z')
                     elif colorType == 'passive':
+                        # Build passive query string (from van der Burg 2020)
                         passiveQuery = '(UMINV > 1.3) and (VMINJ < 1.6) and (UMINV > 0.60+VMINJ)'
+                        # Extract desired quantities from data
                         passive = data.query(passiveQuery).copy()
+                        # Assume star forming are those that are not passive
                         starForming = data[~data['cPHOTID'].isin(passive['cPHOTID'])].copy()
+                        # Check if either axis needs to be put in log scale
                         if useLog[0] == True:
                             passive.loc[:, xQuantityName] = np.log10(passive.loc[:, xQuantityName])
                             starForming.loc[:, xQuantityName] = np.log10(starForming.loc[:, xQuantityName])
                         if useLog[1] == True:
                             passive.loc[:, yQuantityName] = np.log10(passive.loc[:, yQuantityName])
                             starForming.loc[:, yQuantityName] = np.log10(starForming.loc[:, yQuantityName])
+                        # Generate the plot on the subplot
                         axes[i][j].scatter(passive[xQuantityName].values, passive[yQuantityName].values, color=color1, label='Quiescent')
                         axes[i][j].scatter(starForming[xQuantityName].values, starForming[yQuantityName].values, color=color2, label='Star Forming')
                     else:
                         print(colorType, ' is not a valid coloring scheme!')
 
-                    # Plot configurations
+                    # Plot configurations for plotType 2
                     axes[i][j].set(xlabel=xLabel, ylabel=yLabel)
                     if (xRange != None):
                         axes[i][j].set(xlim=xRange)
@@ -332,26 +367,27 @@ class GOGREEN:
                     axes[i][j].set(title=currentClusterName)
                     axes[i][j].legend()
                     currentIndex += 1
-            # Remove the 12th unused subplot from the figure
+            # Remove the 12th subplot from the figure otherwise blank axes will be displayed
             plt.delaxes(axes[3][2])
             # Configure the subplot spacing so axes aren't overlapping
-            plt.subplots_adjust(left=0.1,
-                    bottom=0.1, 
-                    right=0.9, 
-                    top=0.9, 
-                    wspace=0.4, 
-                    hspace=0.4)
+            # These specifc values were found at:
+            # https://www.geeksforgeeks.org/how-to-set-the-spacing-between-subplots-in-matplotlib-in-python/
+            plt.subplots_adjust(left=0.1, bottom=0.1, right=0.9, top=0.9, wspace=0.4, hspace=0.4)
 
         # Plot all clusters on the same plot            
         elif plotType == 3:
             # Loop over every cluster
             for clusterName in self._structClusterNames:
+                # Get all galaxies associated with this cluster
                 data = self.getClusterGalaxies(clusterName)
                 if onlyMembers:
+                    # Reduce data to only contain galaxies classified as members
                     data = self.getMembers(clusterName)
+                # Apply other specified reducing constraints
                 data = self.reduceDF(data, additionalCriteria, useStandards)
-
+                 # Plot depending on how the values should be colored
                 if colorType == None:
+                    # Extract desired quantities from data
                     xData = data[xQuantityName].values
                     yData = data[yQuantityName].values
                     # Check if either axis needs to be put in log scale
@@ -359,43 +395,56 @@ class GOGREEN:
                         xData = np.log10(xData)
                     if useLog[1] == True:
                         yData = np.log10(yData)
+                    # Generate the plot
                     plt.scatter(xData, yData, c=color1)
                 elif colorType == 'membership':
+                    # Extract desired quantities from data
+                    # .copy() is needed here to prevent a warning about making modifications if log scale is to be used
                     specZ = data[~data['zspec'].isna()].copy()
+                    # Assume photZ are those that do not have a specZ
                     photZ = data[data['zspec'].isna()].copy()
+                    # Check if either axis needs to be put in log scale
                     if useLog[0] == True:
                         specZ.loc[:, xQuantityName] = np.log10(specZ.loc[:, xQuantityName])
                         photZ.loc[:, xQuantityName] = np.log10(photZ.loc[:, xQuantityName])
                     if useLog[1] == True:
                         specZ.loc[:, yQuantityName] = np.log10(specZ.loc[:, yQuantityName])
                         photZ.loc[:, yQuantityName] = np.log10(photZ.loc[:, yQuantityName])
-                    # Only add legend labels for the last plot
+                    # Generate the plot
                     if (clusterName != self._structClusterNames[-1]):
                         plt.scatter(specZ[xQuantityName].values, specZ[yQuantityName].values, color=color1)
                         plt.scatter(photZ[xQuantityName].values, photZ[yQuantityName].values, color=color2)
+                    # Only add legend labels for the last plot otherwise the lengend will be filled with multiple duplicates of these labels
                     else:
                         plt.scatter(specZ[xQuantityName].values, specZ[yQuantityName].values, color=color1, label='Spectroscopic z')
                         plt.scatter(photZ[xQuantityName].values, photZ[yQuantityName].values, color=color2, label='Photometric z')
                 elif colorType == 'passive':
+                    # Build passive query string (from van der Burg 2020)
                     passiveQuery = '(UMINV > 1.3) and (VMINJ < 1.6) and (UMINV > 0.60+VMINJ)'
+                     # Extract desired quantities from data
                     passive = data.query(passiveQuery).copy()
+                    # Assume star forming are those that are not passive
                     starForming = data[~data['cPHOTID'].isin(passive['cPHOTID'])].copy()
+                    # Check if either axis needs to be put in log scale
                     if useLog[0] == True:
                         passive.loc[:, xQuantityName] = np.log10(passive.loc[:, xQuantityName])
                         starForming.loc[:, xQuantityName] = np.log10(starForming.loc[:, xQuantityName])
                     if useLog[1] == True:
                         passive.loc[:, yQuantityName] = np.log10(passive.loc[:, yQuantityName])
                         starForming.loc[:, yQuantityName] = np.log10(starForming.loc[:, yQuantityName])
+                    # Generate the plot
                     if (clusterName != self._structClusterNames[-1]):
                         plt.scatter(passive[xQuantityName].values, passive[yQuantityName].values, color=color1)
                         plt.scatter(starForming[xQuantityName].values, starForming[yQuantityName].values, color=color2)
+                    # Only add legend labels for the last plot otherwise the lengend will be filled with multiple duplicates of these labels
                     else:
                         plt.scatter(passive[xQuantityName].values, passive[yQuantityName].values, color=color1, label='Quiescent')
                         plt.scatter(starForming[xQuantityName].values, starForming[yQuantityName].values, color=color2, label='Star Forming')
         else:
             print(plotType, " is not a valid plotting scheme!")
 
-        # plotType == 2 handles plot configurations for each individual subplot
+        # Plot configurations for plotType 1 and 3
+        # (plotType 2 handles plot configurations for each individual subplot)
         if plotType != 2:
             plt.xlabel(xLabel)
             plt.ylabel(yLabel)

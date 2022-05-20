@@ -133,7 +133,8 @@ class GOGREEN:
     def getMembers(self, clusterName:str) -> pd.DataFrame:
         """
         getMembers Gets the member galaxies of a cluster based on the galaxy redshift with respect to the
-                   best estimate of the cluster redshift
+                   best estimate of the cluster redshift. Spectroscopic members are those with (zspec-zclust) < 0.02(1+zspec)
+                   and photometric members are those with (zphot-zclust) < 0.08(1+zphot).
 
         :param clusterName: Name of the cluster whose members should be returned
         :return:            Pandas DataFrame containing the galaxies whose redshift match the membership requirements
@@ -273,7 +274,7 @@ class GOGREEN:
                 plt.scatter(specZ[xQuantityName].values, specZ[yQuantityName].values, color=color1, label='Spectroscopic z')
                 plt.scatter(photZ[xQuantityName].values, photZ[yQuantityName].values, color=color2, label='Photometric z')
             elif colorType == 'passive':
-                # Build passive query string (from van der Burg 2020)
+                # Build passive query string (from van der Burg et al. 2020)
                 passiveQuery = '(UMINV > 1.3) and (VMINJ < 1.6) and (UMINV > 0.60+VMINJ)'
                 # Extract desired quantities from data
                 passive = data.query(passiveQuery).copy()
@@ -339,7 +340,7 @@ class GOGREEN:
                         axes[i][j].scatter(specZ[xQuantityName].values, specZ[yQuantityName].values, color=color1, label='Spectroscopic z')
                         axes[i][j].scatter(photZ[xQuantityName].values, photZ[yQuantityName].values, color=color2, label='Photometric z')
                     elif colorType == 'passive':
-                        # Build passive query string (from van der Burg 2020)
+                        # Build passive query string (from van der Burg et al. 2020)
                         passiveQuery = '(UMINV > 1.3) and (VMINJ < 1.6) and (UMINV > 0.60+VMINJ)'
                         # Extract desired quantities from data
                         passive = data.query(passiveQuery).copy()
@@ -419,7 +420,7 @@ class GOGREEN:
                         plt.scatter(specZ[xQuantityName].values, specZ[yQuantityName].values, color=color1, label='Spectroscopic z')
                         plt.scatter(photZ[xQuantityName].values, photZ[yQuantityName].values, color=color2, label='Photometric z')
                 elif colorType == 'passive':
-                    # Build passive query string (from van der Burg 2020)
+                    # Build passive query string (from van der Burg et al. 2020)
                     passiveQuery = '(UMINV > 1.3) and (VMINJ < 1.6) and (UMINV > 0.60+VMINJ)'
                      # Extract desired quantities from data
                     passive = data.query(passiveQuery).copy()

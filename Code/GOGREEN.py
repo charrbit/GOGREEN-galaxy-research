@@ -203,7 +203,7 @@ class GOGREEN:
                                     Default: True
         :param colorType:          Specifies how to color code the plotted galaxies
                                     Default: None
-                                    Value:   'membership' - member vs non-member
+                                    Value:   'membership' - spectroscopic member vs photometric member
                                     Value:   'passive' - passive vs star forming
         :param colors:             Specifies what colors should be used when plotting
                                     Default: None - random colors are generated
